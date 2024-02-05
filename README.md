@@ -89,3 +89,108 @@ The decoder is part of another model, a Variational Autoencoder (VAE). An autoen
 </p>
 
 > A color image with a resolution of 512x512 consists of 262,144 pixels in each of the 3 channels. Applying the process directly to it would require a lot of time and memory. However, we want to generate images quickly and on relatively simple graphics cards. Therefore, the autoencoder used in Stable Diffusion has a reduction coefficient of 8. This means that an image of shape (3, 512, 512) becomes (3, 64, 64) in the latent space, requiring 64 times less memory.
+
+## Installation
+To begin, let's install the libraries:
+```
+pip install --upgrade diffusers accelerate transformers
+```
+
+After that, we need to find a model. Where exactly to find them will be discussed below. For now, let's use the [Stable Diffusion XL](https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0) model from the Hugging Face platform.
+
+> The installed and imported "accelerate" library significantly speeds up model loading into memory.
+
+## Usage
+The easiest way to use a pre-trained diffusion model for inference is to use the DiffusionPipeline class. It contains everything needed for the diffusion model (tokenizer, UNet, decoder, etc.).
+
+For experiments, let's learn to convert text into an image.
+```
+from diffusers import DiffusionPipeline
+
+pipeline = DiffusionPipeline.from_pretrained("stabilityai/stable-diffusion-xl-base-1.0")
+
+promt = "An image of a squirrel in Picasso style"
+image = pipeline(promt=promt).images[0]
+
+image.save("image_of_squirrel_painting.png")
+```
+Here we:
+
+1. Created an instance of DiffusionPipeline and loaded a pre-trained model from the Hugging Face Hub.
+
+2. Formulated a text query and passed it to the pipeline. Received an image as the output from the pipeline.
+
+3. Saved the image.
+
+Things to note here...
+
+## Cache and Local Usage
+DiffusionPipeline loads and caches all components included in the pipeline: models, tokenizers, schedulers, etc.
+
+You can find them locally at the following path:
+```
+C:\Users\<user_name>\.cache\huggingface\hub
+```
+Alternatively, you can directly download the model you need locally:
+```
+!git lfs install
+!git clone https://huggingface.co/runwayml/stable-diffusion-v1-5
+```
+And then specify the path to it in the pipeline:
+```
+pipeline = DiffusionPipeline.from_pretrained("./stable-diffusion-v1-5")
+```
+## Pipeline Contents
+As mentioned before, Stable Diffusion is not a monolithic model but a complex modular structure. You can see what specifically is included in it by simply printing the pipeline.
+```
+StableDiffusionPipeline {
+  "_class_name": "StableDiffusionPipeline",
+  "_diffusers_version": "0.19.1",
+  "_name_or_path": "/root/work/text_to_image/stable_diffusion_v1_5/snapshots/c9ab35ff5f2c362e9e22fbafe278077e196057f0",
+  "feature_extractor": [
+    "transformers",
+    "CLIPImageProcessor"
+  ],
+  "requires_safety_checker": true,
+  "safety_checker": [
+    "stable_diffusion",
+    "StableDiffusionSafetyChecker"
+  ],
+  "scheduler": [
+    "diffusers",
+    "PNDMScheduler"
+  ],
+  "text_encoder": [
+    "transformers",
+    "CLIPTextModel"
+  ],
+  "tokenizer": [
+    "transformers",
+    "CLIPTokenizer"
+  ],
+  "unet": [
+    "diffusers",
+    "UNet2DConditionModel"
+  ],
+  "vae": [
+    "diffusers",
+    "AutoencoderKL"
+  ]
+}
+```
+## Reproducibility
+Stable Diffusion generates images from random noise. Due to this, you will see a new image with each run. This might be unnecessary in itself, and it can also hinder your ability to improve the image by adjusting parameters (discussed below). Therefore, you can fix the generated image using a seed:
+```
+import torch
+
+generator = torch.Generator("cuda").manual_seed(0)
+image = pipeline(prompt, generator=generator).images[0]
+image
+```
+More information about reproducibility can be found [here](https://huggingface.co/docs/diffusers/using-diffusers/reproducibility).
+
+## Speed and Memory
+By default, DiffusionPipeline performs calculations with float32 precision. You can speed up the inference process (and reduce memory consumption) by switching to lower precision - float16.
+```
+pipeline = DiffusionPipeline.from_pretrained(model_name, torch_dtype=torch.float16)
+```
