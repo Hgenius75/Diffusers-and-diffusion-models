@@ -194,3 +194,85 @@ By default, DiffusionPipeline performs calculations with float32 precision. You 
 ```
 pipeline = DiffusionPipeline.from_pretrained(model_name, torch_dtype=torch.float16)
 ```
+## Main Parameters
+Let's consider some pipeline parameters...
+
+### num_inference_steps
+One of the most crucial parameters. The number of denoising steps. Increasing num_inference_steps usually leads to a higher quality image but comes at the cost of longer computation. Default value = 50.
+```
+image = pipeline(prompt, num_inference_steps=10).images[0]
+```
+
+> The relationship between image quality and the number of steps heavily depends on the scheduler used. Some modern schedulers can produce high-quality images in a relatively small number of steps.
+
+<p align="center">
+  <img src="https://habrastorage.org/r/w1560/getpro/habr/upload_files/90d/678/c23/90d678c23f9022bcd0bf4c1d84202a8b.png">
+</p>
+
+### height and width
+Set the dimensions of the output image (in pixels). However, keep in mind that the model was trained on images of a specific size and is optimized to produce results of the same size. Changing these dimensions will likely degrade the quality of the generated image.
+```
+image = pipeline(prompt, height=256, width=256).images[0]
+```
+<p align="center">
+  <img src="https://habrastorage.org/r/w1560/getpro/habr/upload_files/ea1/4da/9b2/ea14da9b205bded451f5b0cacc9d785d.png">
+</p>
+
+### guidance_scale
+Determines how accurately the generated image corresponds to the input query. A higher value encourages the model to generate images closely tied to the textual input, at the expense of lower image quality. The default value is 7.5.
+```
+image = pipeline(prompt, guidance_scale=10).images[0]
+```
+<p align="center">
+  <img src="https://habrastorage.org/r/w1560/getpro/habr/upload_files/331/39a/e54/33139ae546b948cecd4eb676ebb9e923.png">
+</p>
+
+### Mass Generation
+Generating images one by one can be quite time-consuming. Therefore, mass generation can be employed.
+
+For example, you can generate images for different queries at once:
+```
+# Functiont output several imgs
+def image_grid(imgs, rows=2, cols=2):
+    w, h = imgs[0].size
+    grid = Image.new("RGB", size=(cols * w, rows * h))
+
+    for i, img in enumerate(imgs):
+        grid.paste(img, box=(i % cols * w, i // cols * h))
+
+    return grid 
+
+# Requests 
+prompts = [
+    'red car at night on a racing track',
+    'yellow car at night on a racing track',
+    'blue car at night on a racing track'
+] 
+
+# Form pipeline
+pipeline = DiffusionPipeline.from_pretrained("stabilityai/stable-diffusion-xl-base-1.0")
+images = pipeline(prompts).images
+
+# Save pics
+#for i in range(len(images)):
+#    images[i].save(f'{i}.png')
+
+image_grid(images, rows=1, cols=3)
+```
+<p align="center">
+  <img src="https://habrastorage.org/r/w1560/getpro/habr/upload_files/1c6/efb/c66/1c6efbc66b75e205df7a51dc0a420650.png">
+</p>
+Or you can generate the same query with different seeds:
+
+```
+prompts = 3 * ['red car at night on a racing track'] 
+
+pipeline = DiffusionPipeline.from_pretrained("stabilityai/stable-diffusion-xl-base-1.0")
+images = pipeline(prompts).images
+
+image_grid(images, rows=1, cols=3)
+```
+<p align="center">
+  <img src="https://habrastorage.org/r/w1560/getpro/habr/upload_files/8b0/092/7d7/8b00927d73ea6ac9027258f5dab0b552.png">
+</p>
+The number of images that can fit into memory at once depends on the model used and your GPU. Try increasing the quantity until you encounter an OutOfMemoryError.
